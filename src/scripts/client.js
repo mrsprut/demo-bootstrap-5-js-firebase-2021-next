@@ -1,14 +1,14 @@
 // const BASE_URL = 'http://localhost:4000/api'
 const BASE_URL = 'https://us-central1-buki-2021.cloudfunctions.net/api'
 
-async function fetchTodoItems () {
-  return await fetch(`${BASE_URL}/items`)
+async function fetchTodoItems (userId) {
+  return await fetch(`${BASE_URL}/users/${userId}/items`)
 }
 
 async function addTodoItem (serverTodoItemModel) {
   const response =
     await fetch(
-      `${BASE_URL}/items`,
+      `${BASE_URL}/users/${serverTodoItemModel.userId}/items`,
       {
         method: 'POST',
         headers: {
@@ -24,7 +24,7 @@ async function addTodoItem (serverTodoItemModel) {
 async function updateTodoItem (serverTodoItemModel) {
   const response =
     await fetch(
-      `${BASE_URL}/items/${serverTodoItemModel.id}`,
+      `${BASE_URL}/users/${serverTodoItemModel.userId}/items/${serverTodoItemModel.id}`,
       {
         method: 'PUT',
         headers: {
@@ -36,10 +36,10 @@ async function updateTodoItem (serverTodoItemModel) {
   return response.status === 200
 }
 
-async function deleteTodoItem (id) {
+async function deleteTodoItem (userId, id) {
   const response =
     await fetch(
-      `${BASE_URL}/items/${id}`,
+      `${BASE_URL}/users/${userId}/items/${id}`,
       {
         method: 'DELETE'
       }

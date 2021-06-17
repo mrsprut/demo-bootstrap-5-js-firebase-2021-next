@@ -1,6 +1,6 @@
 export default class TodoItemModel {
   // static lastId = 0
-  constructor(title, details, date, done, id) {
+  constructor(title, details, date, userId, done, id) {
     /* if (!id) {
       this.id = ++TodoItemModel.lastId
     } else {
@@ -10,6 +10,7 @@ export default class TodoItemModel {
     this.title = title
     this.details = details
     this.date = date
+    this.userId = userId
     this.done = done
     // console.log(this)
   }

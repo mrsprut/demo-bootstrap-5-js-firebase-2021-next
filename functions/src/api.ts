@@ -9,8 +9,16 @@ exports.api = function (functions) {
     public title: String
     public description: String
     public date: Date
+    public userId: string
     public done: Boolean
-    constructor (title: String, description: String, date: Date, id: number = 0, done: Boolean = false) {
+    constructor (
+      title: String,
+      description: String,
+      date: Date,
+      userId: string,
+      id: number = 0,
+      done: Boolean = false
+    ) {
       if(!id || id === 0) {
         this.id = ++TodoItemModel.lastId
       } else {
@@ -19,26 +27,29 @@ exports.api = function (functions) {
       this.title = title
       this.description = description
       this.date = date
+      this.userId = userId
       this.done = done
     }
   }
   
   const repository = {
-    todoList: [
-      new TodoItemModel('t1', 'd1', new Date()),
-      new TodoItemModel('t2', 'd2', new Date()),
-      new TodoItemModel('t3', 'd3', new Date()),
-    ]
+    todoList: []
   }
 
   const app = express()
 
   app.use((req, res, next) => { next(); }, cors({maxAge: 84600}))
 
-  app.route('/items')
+  app.route('/users/:userId/items')
     .get(function (req, res) {
       try {
-        res.send(`{"data": ${JSON.stringify(repository.todoList.sort((item1, item2) => item2.id - item1.id))}}`)
+        res.send(
+          `{"data": ${JSON.stringify(
+            repository.todoList
+              .filter(todo => todo.userId === req.params.userId)
+              .sort((item1, item2) => item2.id - item1.id)
+          )}}`
+        )
       } catch (error) {
         res.status(500).json({"error": error})
       }
@@ -47,7 +58,7 @@ exports.api = function (functions) {
       try {
         const newItem = req.body
         const newServerTodoItemModel =
-          new TodoItemModel(newItem.title, newItem.description, newItem.date)
+          new TodoItemModel(newItem.title, newItem.description, newItem.date, req.params.userId)
         repository.todoList.push(newServerTodoItemModel)
         res.status(201).json(
           {
@@ -60,11 +71,14 @@ exports.api = function (functions) {
       }
     })
 
-  app.route('/items/:id')
+  app.route('/users/:userId/items/:id')
     .put(function (req, res) {
       try {
         const currentTodo =
-          repository.todoList.find(todo => todo.id === Number(req.params.id)) ?? null
+          repository.todoList.find(
+            todo => todo.id === Number(req.params.id)
+              && todo.userId === req.params.userId
+          ) ?? null
         if (currentTodo) {
           const updatedItem = req.body
           currentTodo.title = updatedItem.title
@@ -80,7 +94,10 @@ exports.api = function (functions) {
     .delete(function (req, res) {
       try {
         repository.todoList.splice(
-          repository.todoList.findIndex(a => a.id === Number(req.params.id)),
+          repository.todoList.findIndex(
+            todo => todo.id === Number(req.params.id)
+              && todo.userId === req.params.userId
+          ),
           1
         )
         res.status(204).send()

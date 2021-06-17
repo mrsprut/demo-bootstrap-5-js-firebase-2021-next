@@ -1,11 +1,14 @@
 // Firebase App (the core Firebase SDK) is always required and
 // must be listed before other Firebase SDKs
 import firebase from 'firebase/app'
+import 'firebase/analytics'
+import 'firebase/auth'
 import firebaseConfig from '../config/firebase'
 // import bootstrap from '../node_modules/bootstrap/dist/js/bootstrap.bundle.min.js'
 import { Modal } from 'bootstrap'
 
 import TodoItemModel from './item'
+import UserModel from './user'
 import {
   serverItemModelToClientItemModel as sToCModelConvert,
   clientItemModelToServerItemModel as cToSModelConvert}
@@ -14,6 +17,7 @@ import { fetchTodoItems, addTodoItem, updateTodoItem, deleteTodoItem } from './c
 
 // Initialize Firebase
 firebase.initializeApp(firebaseConfig)
+firebase.analytics()
 
 /* state */
 const viewState = {
@@ -24,7 +28,39 @@ const viewState = {
     'detailsInput': '',
     'dateInput': new Date().toISOString()
   },
-  'fabSubmitInit': false
+  'fabSubmitInit': false,
+  'user': null
+}
+
+firebase.auth().onAuthStateChanged(async (user) => {
+  if (user) {
+    viewState.user =
+      new UserModel(user.uid, user.displayName, user.photoURL, user.email)
+    document.querySelector('.navbar-brand').innerText = `Todo List (${user.displayName})`
+    signOut.style.display = 'list-item'
+    fab.style.display = 'block'
+    // TODO persist user data using cookie
+    fetchItemsAction(viewState.user.id)
+  } else {
+    viewState.user = null
+    document.querySelector('.navbar-brand').innerText = 'Todo List'
+    signOut.style.display = 'none'
+    fab.style.display = 'none'
+    viewState.items.length = 0
+    todoItemsContainerRow.innerHTML = ''
+  }
+})
+
+const provider = new firebase.auth.GoogleAuthProvider()
+provider.addScope('profile')
+provider.addScope('email')
+provider.addScope('openid')
+try {
+  firebase.auth().signInWithPopup(provider)
+  // await firebase.auth().signInWithRedirect(provider)
+} catch (ex) {
+  console.log(ex)
+  alert('Auth Error. Allow Pop-ups in Your Browser')
 }
 
 /* init */
@@ -38,6 +74,7 @@ const todoItemForm = document.querySelector('#saveModal form')
 const todoItemDeleteModalConfirmButton = document.getElementById('deleteModal__confirm')
 const todoItemsContainerRow = document.getElementById('todo-items-container-row')
 const fab = document.getElementById('fab')
+const signOut = document.getElementById('signOut')
 
 /* bootstrap init */
 const saveModal =
@@ -51,7 +88,7 @@ const deleteModal =
 // todoItemFormDateInput.min = viewState.form.dateInput
 
 function fetchItemsAction () {
-  fetchTodoItems().then((response) => {
+  fetchTodoItems(viewState.user.id).then((response) => {
     return response.json()
   }).then((serverItemModel) => {
     if (serverItemModel.data) {
@@ -84,7 +121,6 @@ todoItemFormDateInput.addEventListener('change', (ev) => {
     const formDateInputChangeEvent = new Event('change', {'cancelable': true})
     shouldDateInputChangeEmitting = false
     // todoItemFormDateOutput.style.zIndex = 1000
-    console.log(todoItemFormDateOutput)
     console.log(todoItemFormDateInput.dispatchEvent(formDateInputChangeEvent))
   } else {
     shouldDateInputChangeEmitting = true 
@@ -122,6 +158,7 @@ todoItemSaveButton.addEventListener('click', (ev) => {
             selectedItem.title = viewState.form.titleInput
             selectedItem.details = viewState.form.detailsInput
             selectedItem.date = viewState.form.dateInput
+            selectedItem.userId = viewState.user.id
             selectedItem.id = viewState.selectedItemId
             const responseSuccess =
               await updateTodoItem(cToSModelConvert(selectedItem))
@@ -144,7 +181,8 @@ todoItemSaveButton.addEventListener('click', (ev) => {
           const newClientItem = new TodoItemModel(
             viewState.form.titleInput,
             viewState.form.detailsInput,
-            viewState.form.dateInput
+            viewState.form.dateInput,
+            viewState.user.id
           )
           const responseId = await addTodoItem(cToSModelConvert(newClientItem))
           if (responseId) {
@@ -176,7 +214,7 @@ todoItemDeleteModalConfirmButton.addEventListener('click', async (ev) => {
   if (selectedItem) {
     // по индексу, определенному по ссылке на элемнт,
     // удаляем один элемент
-    const responseSuccess = await deleteTodoItem(viewState.selectedItemId)
+    const responseSuccess = await deleteTodoItem(viewState.user.id, viewState.selectedItemId)
     if (responseSuccess) {
       viewState.items.splice(viewState.items.indexOf(selectedItem), 1)
       viewState.selectedItemId = null
@@ -254,7 +292,6 @@ document.addEventListener('click', function(e) {
 
 function fillItems () {
   // todoItemsContainerRow.innerHTML = ''
-  console.log('fill', viewState.items)
   const itemViews = viewState.items.map(item =>
       `<div class="col-sm-1 col-md-6 col-lg-4 col-lg-3">
         <div class="card mb-3 ${item.done ? 'list-item-is-done' : ''}">
@@ -295,4 +332,6 @@ function fillItems () {
   todoItemsContainerRow.innerHTML = itemViews
 }
 
-fetchItemsAction()
+signOut.addEventListener('click', function(e) {
+  firebase.auth().signOut()
+})
